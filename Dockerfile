@@ -6,14 +6,11 @@ WORKDIR /app
 COPY package*.json ./
 COPY tsconfig.json ./
 
-# Install dependencies
-RUN npm install
-
-# Copy source code
+# Copy source code first (needed for build)
 COPY src ./src
 
-# Build TypeScript
-RUN npm run build
+# Install dependencies (this will trigger the build in prepare script)
+RUN npm install
 
 # Expose port
 EXPOSE 3000

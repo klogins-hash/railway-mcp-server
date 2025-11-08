@@ -1,0 +1,13 @@
+{
+  "mcpServers": {
+    "railway-mcp": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@modelcontextprotocol/server-sse",
+        "https://your-railway-url.railway.app/sse?apiKey=tVqsmfdmMRXckUThTL+8mSB1se4ZcXBnlOCQSJVIgjI="
+      ],
+      "description": "Railway MCP Server - Execute commands and manage files on Railway service"
+    }
+  }
+}
