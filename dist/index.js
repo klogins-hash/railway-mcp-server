@@ -10,12 +10,50 @@ const execAsync = promisify(exec);
 // Environment configuration
 const PORT = process.env.PORT || 3000;
 const API_KEY = process.env.API_KEY || "change-me-in-production";
+const PROJECT_ID = process.env.RAILWAY_PROJECT_ID || "c6955207-08e0-412e-897d-e28d331c0a40";
+const ENVIRONMENT_ID = process.env.RAILWAY_ENVIRONMENT_ID || "c5c9eb3b-f9e7-4062-8ee0-38fd8f380200";
+// In-memory service registry
+const serviceRegistry = new Map();
+const healthStatusMap = new Map();
+const serviceConnections = new Map();
+// Initialize with known services
+function initializeServiceRegistry() {
+    // Add the MCP server itself
+    serviceRegistry.set("railway-mcp-server", {
+        id: "381f1bab-f067-4fa0-828f-316aecf63c62",
+        name: "railway-mcp-server",
+        type: "mcp-server",
+        status: "running",
+        port: 8080,
+        internalDomain: "railway-mcp-server.railway.internal",
+        healthCheckEndpoint: "/health",
+        environment: {
+            RAILWAY_PROJECT_ID: PROJECT_ID,
+            RAILWAY_ENVIRONMENT_ID: ENVIRONMENT_ID,
+            RAILWAY_SERVICE_NAME: "railway-mcp-server",
+            PORT: "8080",
+        },
+    });
+    // Add Code Server
+    serviceRegistry.set("code-server", {
+        id: "code-server-production",
+        name: "code-server",
+        type: "code-server",
+        status: "running",
+        url: "code-server-production-b0d0.up.railway.app",
+        port: 443,
+        environment: {
+            RAILWAY_PROJECT_ID: PROJECT_ID,
+            RAILWAY_ENVIRONMENT_ID: ENVIRONMENT_ID,
+        },
+    });
+}
 // Create Express app
 const app = express();
 app.use(express.json());
 // API Key middleware
 const authenticateApiKey = (req, res, next) => {
-    const apiKey = req.headers['x-api-key'] || req.query.apiKey;
+    const apiKey = req.headers["x-api-key"] || req.query.apiKey;
     if (apiKey !== API_KEY) {
         return res.status(401).json({ error: "Unauthorized: Invalid API key" });
     }
@@ -23,7 +61,57 @@ const authenticateApiKey = (req, res, next) => {
 };
 // Health check endpoint (no auth required)
 app.get("/health", (req, res) => {
-    res.json({ status: "healthy", service: "railway-mcp-server" });
+    res.json({
+        status: "healthy",
+        service: "railway-mcp-server-enhanced",
+        uptime: process.uptime(),
+        timestamp: new Date().toISOString(),
+    });
+});
+// Service registry endpoint
+app.get("/services", authenticateApiKey, async (req, res) => {
+    const services = Array.from(serviceRegistry.values());
+    res.json({
+        total: services.length,
+        services: services,
+        timestamp: new Date().toISOString(),
+    });
+});
+// Service health status endpoint
+app.get("/services/health", authenticateApiKey, async (req, res) => {
+    const healthStatuses = Array.from(healthStatusMap.values());
+    res.json({
+        total: healthStatuses.length,
+        healthy: healthStatuses.filter((h) => h.healthy).length,
+        unhealthy: healthStatuses.filter((h) => !h.healthy).length,
+        statuses: healthStatuses,
+        timestamp: new Date().toISOString(),
+    });
+});
+// Service connections endpoint
+app.get("/services/connections", authenticateApiKey, async (req, res) => {
+    const connections = Array.from(serviceConnections.values()).flat();
+    res.json({
+        total: connections.length,
+        connected: connections.filter((c) => c.status === "connected").length,
+        connections: connections,
+        timestamp: new Date().toISOString(),
+    });
+});
+// Configuration export endpoint
+app.get("/config/export", authenticateApiKey, async (req, res) => {
+    const config = {
+        project: {
+            id: PROJECT_ID,
+            name: "romantic-growth",
+            environment: ENVIRONMENT_ID,
+        },
+        services: Array.from(serviceRegistry.values()),
+        connections: Array.from(serviceConnections.values()).flat(),
+        health: Array.from(healthStatusMap.values()),
+        exportedAt: new Date().toISOString(),
+    };
+    res.json(config);
 });
 // SSE endpoint for MCP connection
 app.get("/sse", authenticateApiKey, async (req, res) => {
