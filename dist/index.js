@@ -70,6 +70,10 @@ app.get("/health", (req, res) => {
 });
 // Service registry endpoint
 app.get("/services", authenticateApiKey, async (req, res) => {
+    // Ensure registry is initialized
+    if (serviceRegistry.size === 0) {
+        initializeServiceRegistry();
+    }
     const services = Array.from(serviceRegistry.values());
     res.json({
         total: services.length,
